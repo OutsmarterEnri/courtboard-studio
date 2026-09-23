@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.openai/
+.sites-runtime/
+playwright-report/
+test-results/
+coverage/
+*.log
+*.tar.gz
+*.zip
+.DS_Store
+Thumbs.db

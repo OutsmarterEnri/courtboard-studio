@@ -1,0 +1,23 @@
+{
+  "name": "courtboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lavagnetta tattica per basket con fasi animate ed esportazione video",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node scripts/serve.cjs",
+    "check": "node --check dist/app.js && node --check dist/geometry.js && node --check scripts/serve.cjs",
+    "test:unit": "node --test tests/geometry.test.cjs",
+    "test:browser": "node --test tests/browser.test.cjs",
+    "test": "npm run check && npm run test:unit && npm run test:browser",
+    "format": "prettier --write dist scripts tests README.md CONTRIBUTING.md package.json .github",
+    "format:check": "prettier --check dist scripts tests README.md CONTRIBUTING.md package.json .github"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "prettier": "3.9.9"
+  }
+}
