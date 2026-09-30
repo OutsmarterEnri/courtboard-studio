@@ -5,14 +5,14 @@ const { once } = require("node:events");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { chromium } = require("playwright");
-const geometry = require("../dist/geometry.js");
+const geometry = require("../../dist/geometry.js");
 
 test(
   "rotated editing, presets, JSON and actual video export",
   { timeout: 90000 },
   async () => {
     const server = spawn(process.execPath, ["scripts/serve.cjs"], {
-      cwd: path.resolve(__dirname, ".."),
+      cwd: path.resolve(__dirname, "../.."),
       env: { ...process.env, PORT: "0" },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -27,11 +27,18 @@ test(
       const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));
       await page.goto(url);
+      async function setting(id, value) {
+        await page.click("#openSettings");
+        await page.selectOption(id, value);
+        await page.click("#closeSettings");
+      }
+      await page.click("#openSettings");
       await page.locator("#title").fill("Pick & roll — rotazione");
+      await page.click("#closeSettings");
       for (const view of ["full", "half"]) {
-        await page.selectOption("#view", view);
+        await setting("#view", view);
         for (const angle of [0, 90, 180, 270]) {
-          await page.selectOption("#rotation", String(angle));
+          await setting("#rotation", String(angle));
           const width = view === "full" ? 1500 : 800;
           const expectedSize = geometry.dimensions(width, 850, angle);
           const actualSize = await page.evaluate(() => ({
@@ -39,7 +46,7 @@ test(
             height: cv.height,
           }));
           assert.deepEqual(actualSize, expectedSize);
-          await page.selectOption("#selected", "a0");
+          await setting("#selected", "a0");
           const before = await page.evaluate(() => ({
             ...current().items.find((o) => o.id === "a0"),
           }));
@@ -78,11 +85,11 @@ test(
           );
         }
       }
-      await page.selectOption("#teams", "attack");
+      await setting("#teams", "attack");
       assert.equal(await page.locator("#selected option").count(), 6);
       await page.click("#cone");
       await page.click("#addFrame");
-      await page.selectOption("#selected", "a0");
+      await setting("#selected", "a0");
       await page.locator("#court").focus();
       await page.keyboard.press("ArrowRight");
       const interpolation = await page.evaluate(() => ({
@@ -99,7 +106,9 @@ test(
         (interpolation.a.y + interpolation.b.y) / 2,
       );
       const saving = page.waitForEvent("download");
+      await page.click("#openSettings");
       await page.click("#save");
+      await page.click("#closeSettings");
       const saved = await saving;
       const jsonPath = await saved.path();
       const json = JSON.parse(await fs.readFile(jsonPath, "utf8"));
@@ -108,18 +117,21 @@ test(
         view: "half",
         rotation: 270,
       });
-      await page.selectOption("#rotation", "0");
+      await setting("#rotation", "0");
       await page.locator("#file").setInputFiles(jsonPath);
       await page.waitForFunction(
         () =>
           document.getElementById("status").textContent === "Schema caricato.",
       );
       assert.equal(await page.locator("#rotation").inputValue(), "270");
+      await page.click("#openSettings");
       await page.click("#rotate");
+      await page.click("#closeSettings");
       assert.equal(await page.locator("#rotation").inputValue(), "0");
-      await page.selectOption("#rotation", "90");
+      await setting("#rotation", "90");
       const exporting = page.waitForEvent("download");
       await page.click("#export");
+      await page.click("#downloadVideo");
       const video = await exporting;
       const bytes = await fs.readFile(await video.path());
       assert.ok(bytes.length > 1000);
@@ -146,7 +158,8 @@ test(
         },
       );
       assert.deepEqual(metadata, { width: 850, height: 800 });
-      await page.selectOption("#teams", "both");
+      await page.click("#closeVideo");
+      await setting("#teams", "both");
       assert.equal(await page.locator("#selected option").count(), 12);
       await page.setViewportSize({ width: 390, height: 844 });
       assert.equal(

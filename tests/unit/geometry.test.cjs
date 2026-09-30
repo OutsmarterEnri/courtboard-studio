@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const geometry = require("../dist/geometry.js");
+const geometry = require("../../dist/geometry.js");
 for (const width of [800, 1500])
   for (const angle of [0, 90, 180, 270]) {
     test(`round-trip pointer coordinates: width=${width}, angle=${angle}`, () => {

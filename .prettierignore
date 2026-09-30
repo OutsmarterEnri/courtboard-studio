@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+dist/icons/
+certs/
+test-results/
+playwright-report/
+coverage/
+*.zip
+*.tar.gz

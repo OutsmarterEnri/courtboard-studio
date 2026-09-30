@@ -2,612 +2,279 @@
 <html lang="it">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Courtboard — Lavagnetta tattica</title>
-    <style>
-      :root {
-        font-family: Inter, Arial, sans-serif;
-        color: #edf1f5;
-        background: #11171c;
-        font-size: 16px;
-        --muted: #a5b0ba;
-        --line: #303a43;
-        --orange: #ffac55;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-      }
-      button,
-      input,
-      select {
-        font: inherit;
-      }
-      button {
-        cursor: pointer;
-        border: 1px solid var(--line);
-        background: #242e37;
-        color: #f4f6f8;
-        border-radius: 8px;
-        min-height: 44px;
-        padding: 9px 13px;
-      }
-      button:hover {
-        background: #35434f;
-      }
-      button:focus-visible,
-      input:focus-visible,
-      select:focus-visible,
-      canvas:focus-visible {
-        outline: 3px solid #ffac55;
-        outline-offset: 3px;
-      }
-      button:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-      }
-      .primary {
-        background: var(--orange);
-        border-color: var(--orange);
-        color: #23170d;
-        font-weight: 700;
-      }
-      .primary:hover {
-        background: #ffc182;
-      }
-      header {
-        padding: 20px 28px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border-bottom: 1px solid var(--line);
-        gap: 20px;
-      }
-      .brand {
-        font-size: 23px;
-        font-weight: 850;
-        letter-spacing: -1px;
-      }
-      .brand span {
-        color: var(--orange);
-      }
-      .eyebrow {
-        font-size: 12px;
-        color: var(--muted);
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        margin-bottom: 8px;
-      }
-      .header-actions {
-        display: flex;
-        gap: 8px;
-      }
-      .layout {
-        display: grid;
-        grid-template-columns: 240px minmax(0, 1fr);
-        min-height: calc(100vh - 85px);
-      }
-      aside {
-        background: #192129;
-        padding: 24px 18px;
-        border-right: 1px solid var(--line);
-      }
-      h2 {
-        font-size: 14px;
-        margin: 0 0 14px;
-        font-weight: 650;
-      }
-      section.controls {
-        padding-bottom: 22px;
-        margin-bottom: 22px;
-        border-bottom: 1px solid var(--line);
-      }
-      label {
-        font-size: 14px;
-        display: block;
-        margin-bottom: 8px;
-      }
-      input,
-      select {
-        background: #10171d;
-        border: 1px solid #46535f;
-        border-radius: 7px;
-        color: white;
-        padding: 11px;
-        width: 100%;
-        min-height: 44px;
-      }
-      input[type="checkbox"] {
-        width: 18px;
-        min-height: 18px;
-        accent-color: var(--orange);
-      }
-      .tools {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-      .tools button {
-        font-size: 14px;
-        text-align: left;
-        padding: 10px;
-      }
-      .tools button[aria-pressed="true"] {
-        color: #ffc78e;
-        background: #4a3523;
-        border-color: #ba804a;
-      }
-      .symbol {
-        display: block;
-        font-size: 24px;
-        height: 30px;
-        font-weight: 500;
-      }
-      .note {
-        font-size: 13px;
-        line-height: 1.6;
-        color: var(--muted);
-        margin: 12px 0 0;
-      }
-      .row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-      .row label {
-        margin: 0;
-      }
-      .wide {
-        width: 100%;
-      }
-      .main {
-        padding: 24px 28px;
-        min-width: 0;
-      }
-      .topline {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: center;
-        margin-bottom: 18px;
-      }
-      h1 {
-        font-size: 22px;
-        margin: 0 0 6px;
-        letter-spacing: -0.5px;
-      }
-      .small {
-        font-size: 13px;
-        color: var(--muted);
-      }
-      .badge {
-        border: 1px solid #46535f;
-        border-radius: 30px;
-        padding: 8px 12px;
-        font-size: 12px;
-        white-space: nowrap;
-        color: #c3cdd5;
-      }
-      .court-wrap {
-        padding: 16px;
-        background: #202a32;
-        border: 1px solid #3d4952;
-        border-radius: 12px;
-        box-shadow: 0 16px 40px #0003;
-      }
-      canvas.compact {
-        width: min(100%, 650px);
-        margin-inline: auto;
-      }
-      canvas.portrait {
-        width: min(100%, 520px);
-        margin-inline: auto;
-      }
-      canvas {
-        width: 100%;
-        display: block;
-        aspect-ratio: 30/17;
-        touch-action: none;
-        border-radius: 5px;
-        cursor: crosshair;
-      }
-      .court-bottom {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        align-items: center;
-        margin-top: 12px;
-      }
-      .timeline {
-        margin-top: 20px;
-        padding: 20px;
-        background: #192129;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-      }
-      .timeline-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
-        align-items: center;
-      }
-      .timeline-head h2 {
-        margin-bottom: 6px;
-      }
-      .frames {
-        display: flex;
-        gap: 10px;
-        overflow: auto;
-        padding: 16px 0;
-      }
-      .frame {
-        min-width: 125px;
-        text-align: left;
-        padding: 12px;
-      }
-      .frame.active {
-        border-color: var(--orange);
-        background: #413225;
-      }
-      .frame strong {
-        display: block;
-        margin-bottom: 8px;
-      }
-      .frame small {
-        color: #b9c3cb;
-      }
-      .playbar {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        border-top: 1px solid var(--line);
-        padding-top: 14px;
-      }
-      .playbar input {
-        padding: 0;
-        min-height: 24px;
-        accent-color: var(--orange);
-      }
-      .playbar output {
-        min-width: 90px;
-        font-size: 13px;
-      }
-      .help {
-        margin-top: 16px;
-        line-height: 1.7;
-        color: #abb8c3;
-        font-size: 14px;
-      }
-      .help summary {
-        cursor: pointer;
-        color: #dde5eb;
-        min-height: 40px;
-      }
-      .legend {
-        display: flex;
-        gap: 22px;
-        flex-wrap: wrap;
-        margin-top: 10px;
-      }
-      .legend b {
-        color: var(--orange);
-        margin-right: 6px;
-      }
-      #status {
-        min-height: 24px;
-        margin-top: 12px;
-        color: #ffc78e;
-        font-size: 14px;
-      }
-      .selection {
-        margin-top: 12px;
-      }
-      .selection button {
-        font-size: 14px;
-      }
-      footer {
-        font-size: 12px;
-        color: var(--muted);
-        margin-top: 18px;
-      }
-      a {
-        color: #ffc78e;
-      }
-      @media (min-width: 1500px) {
-        .main {
-          max-width: 1500px;
-          margin: auto;
-          width: 100%;
-        }
-      }
-      @media (max-width: 950px) {
-        .layout {
-          grid-template-columns: 195px 1fr;
-        }
-        .main {
-          padding: 18px 14px;
-        }
-        aside {
-          padding: 20px 12px;
-        }
-        .court-wrap {
-          padding: 8px;
-        }
-        .timeline-head {
-          flex-wrap: wrap;
-        }
-        .header-actions button {
-          font-size: 14px;
-        }
-      }
-      @media (max-width: 650px) {
-        header {
-          padding: 16px;
-          flex-wrap: wrap;
-        }
-        .layout {
-          display: flex;
-          flex-direction: column;
-        }
-        aside {
-          border-right: 0;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-          padding: 16px;
-        }
-        section.controls {
-          margin: 0;
-          padding-bottom: 12px;
-        }
-        .tools {
-          grid-template-columns: repeat(3, 1fr);
-        }
-        .tool-section {
-          grid-column: 1/-1;
-          grid-row: 2;
-        }
-        .tools .symbol {
-          font-size: 20px;
-        }
-        .main {
-          padding: 16px 10px;
-          order: -1;
-        }
-        .badge {
-          display: none;
-        }
-        .court-bottom {
-          flex-wrap: wrap;
-        }
-        .timeline {
-          padding: 14px;
-        }
-        .playbar {
-          flex-wrap: wrap;
-        }
-        .playbar input {
-          flex-basis: 100%;
-          order: 3;
-        }
-        .header-actions {
-          flex-wrap: wrap;
-        }
-        .note {
-          font-size: 12px;
-        }
-      }
-    </style>
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#11171c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Courtboard" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Courtboard — Studio locale</title>
   </head>
   <body>
-    <header>
-      <div>
-        <div class="eyebrow">Basketball playbook</div>
+    <div class="app">
+      <header class="app-header">
         <div class="brand">
-          COURT<span>BOARD</span
-          ><span
-            style="
-              font-size: 14px;
-              color: #a5b0ba;
-              font-weight: 400;
-              letter-spacing: 0;
-            "
-          >
-            / Studio</span
-          >
+          COURT<span>BOARD</span><small>STUDIO LOCALE</small>
         </div>
+        <div class="header-actions">
+          <span id="saveStatus" class="save-state" role="status"
+            >Caricamento locale…</span
+          ><button id="export" class="primary">Esporta video</button
+          ><button
+            id="openSettings"
+            aria-haspopup="dialog"
+            aria-controls="settings"
+          >
+            ☰ <span>Impostazioni</span>
+          </button>
+        </div>
+      </header>
+      <section class="sequence" aria-label="Sequenza dei frame">
+        <div class="sequence-top">
+          <h1>Sequenza <span id="frameCount">01 frame</span></h1>
+          <div class="frame-actions">
+            <button id="previousFrame" aria-label="Frame precedente">‹</button
+            ><button id="nextFrame" aria-label="Frame successivo">›</button
+            ><button id="addFrame" class="primary">+ Aggiungi frame</button
+            ><button id="deleteFrame" aria-label="Elimina frame corrente">
+              Elimina</button
+            ><label class="duration-label" for="duration"
+              >Durata
+              <input
+                id="duration"
+                type="number"
+                min="0.5"
+                max="30"
+                step="0.5"
+                value="2"
+              />
+              s</label
+            >
+          </div>
+        </div>
+        <div class="frames" id="frames" aria-label="Frame dello schema"></div>
+        <div class="transport">
+          <button id="play">▶ Riproduci</button
+          ><button id="stop" aria-label="Torna all'inizio">↶</button
+          ><input
+            id="scrub"
+            type="range"
+            min="0"
+            max="2"
+            value="0"
+            step="0.01"
+            aria-label="Posizione nella registrazione"
+          /><output id="clock">0.0 / 2.0 s</output
+          ><span class="timeline-hint">Nuovo frame → sposta → riproduci</span>
+        </div>
+      </section>
+      <main id="workspace" class="workspace">
+        <div id="boardStage" class="board-stage">
+          <div id="boardSurface" class="board-surface">
+            <canvas
+              id="court"
+              width="1500"
+              height="850"
+              tabindex="0"
+              aria-label="Lavagnetta. Disegna con dito o penna; seleziona i giocatori e spostali con le frecce."
+            ></canvas>
+          </div>
+        </div>
+        <nav class="tool-dock" aria-label="Strumenti di disegno">
+          <div id="tools" class="tools">
+            <button
+              data-tool="move"
+              aria-pressed="true"
+              title="Seleziona e sposta"
+            >
+              <span class="symbol">↖</span><span>Sposta</span></button
+            ><button
+              data-tool="pen"
+              aria-pressed="false"
+              title="Penna a mano libera"
+            >
+              <span class="symbol">✎</span><span>Penna</span></button
+            ><button
+              data-tool="erase"
+              aria-pressed="false"
+              title="Gomma per i segni"
+            >
+              <span class="symbol">▱</span><span>Gomma</span></button
+            ><button data-tool="run" aria-pressed="false">
+              <span class="symbol">→</span><span>Taglio</span></button
+            ><button data-tool="pass" aria-pressed="false">
+              <span class="symbol">⇢</span><span>Passaggio</span></button
+            ><button data-tool="dribble" aria-pressed="false">
+              <span class="symbol">↝</span><span>Palleggio</span></button
+            ><button data-tool="screen" aria-pressed="false">
+              <span class="symbol">⊣</span><span>Blocco</span></button
+            ><button data-tool="shot" aria-pressed="false">
+              <span class="symbol">⇉</span><span>Tiro</span>
+            </button>
+          </div>
+          <div class="tool-options">
+            <label class="color-label" for="ink"
+              >Colore<input
+                type="color"
+                id="ink"
+                value="#f8e7b8"
+                aria-label="Colore del segno" /></label
+            ><label for="strokeWidth"
+              >Tratto<select id="strokeWidth">
+                <option value="3">Fine</option>
+                <option value="5" selected>Medio</option>
+                <option value="9">Spesso</option>
+              </select></label
+            ><button
+              id="undoLine"
+              title="Annulla"
+              aria-label="Annulla modifica"
+            >
+              ↶</button
+            ><button
+              id="redo"
+              title="Ripristina"
+              aria-label="Ripristina modifica"
+            >
+              ↷</button
+            ><button id="cone">+ Cinesino</button
+            ><button id="barrier">+ Ostacolo</button>
+          </div>
+        </nav>
+      </main>
+      <footer class="statusbar">
+        <span id="status" role="status" aria-live="polite"
+          >Disponi il primo frame, poi aggiungi quello successivo.</span
+        ><button id="cancelExport" hidden>Annulla esportazione</button
+        ><span id="courtbadge"></span>
+      </footer>
+    </div>
+    <dialog id="settings" class="settings">
+      <div class="drawer-head">
+        <div>
+          <small>IL TUO SPAZIO DI LAVORO</small>
+          <h2>Impostazioni</h2>
+        </div>
+        <button id="closeSettings" aria-label="Chiudi impostazioni">✕</button>
       </div>
-      <div class="header-actions">
-        <button id="save">Salva schema</button
-        ><button id="load">Apri schema</button
-        ><button id="export" class="primary">↓ Esporta video</button
-        ><input type="file" id="file" accept="application/json,.json" hidden />
-      </div>
-    </header>
-    <div class="layout">
-      <aside>
-        <section class="controls">
-          <h2>IL TUO SCHEMA</h2>
-          <label for="title">Titolo nel campo</label
+      <div class="drawer-body">
+        <section>
+          <label for="title">Titolo dello schema</label
           ><input id="title" maxlength="70" value="Nuovo schema" />
-          <p class="note">Sempre in alto a sinistra, anche nel video.</p>
+          <p class="note">In alto a sinistra, anche nel video.</p>
         </section>
-        <section class="controls">
-          <h2>PRESET LAVAGNETTA</h2>
+        <section>
+          <h3>Campo e giocatori</h3>
           <label for="teams">Giocatori</label
           ><select id="teams">
             <option value="both">Attacco / difesa</option>
             <option value="attack">Solo attacco</option></select
-          ><label for="view" style="margin-top: 14px"
-            >Visualizzazione campo</label
+          ><label for="view">Campo</label
           ><select id="view">
             <option value="full">Campo completo</option>
             <option value="half">Metà campo offensiva</option></select
-          ><label for="rotation" style="margin-top: 14px"
-            >Rotazione del campo</label
-          ><select id="rotation">
-            <option value="0">0° · Originale</option>
-            <option value="90">90° · Quarto di giro</option>
-            <option value="180">180° · Campo invertito</option>
-            <option value="270">270° · Tre quarti di giro</option></select
-          ><button id="rotate" class="wide" style="margin-top: 8px">
-            ↻ Ruota di 90°
-          </button>
-          <p class="note">
-            La metà offensiva segue la rotazione. Titolo e numeri restano
-            leggibili. I preset valgono anche per il video.
-          </p>
-        </section>
-        <section class="controls tool-section">
-          <h2>STRUMENTI</h2>
-          <div class="tools" id="tools">
-            <button data-tool="move" aria-pressed="true">
-              <span class="symbol">↖</span>Seleziona</button
-            ><button data-tool="run" aria-pressed="false">
-              <span class="symbol">→</span>Movimento</button
-            ><button data-tool="pass" aria-pressed="false">
-              <span class="symbol">⇢</span>Passaggio</button
-            ><button data-tool="dribble" aria-pressed="false">
-              <span class="symbol">↝</span>Palleggio</button
-            ><button data-tool="screen" aria-pressed="false">
-              <span class="symbol">⊣</span>Blocco</button
-            ><button data-tool="shot" aria-pressed="false">
-              <span class="symbol">⇉</span>Tiro
-            </button>
-          </div>
-          <p class="note" id="toolhint">
-            Trascina un elemento. Oppure selezionalo e usa le frecce della
-            tastiera.
-          </p>
-        </section>
-        <section class="controls">
-          <h2>ELEMENTI IN CAMPO</h2>
+          ><label for="rotation">Rotazione</label>
           <div class="row">
-            <button id="cone">+ Cinesino</button
-            ><button id="barrier">+ Ostacolo</button>
+            <select id="rotation">
+              <option value="0">0° · Originale</option>
+              <option value="90">90°</option>
+              <option value="180">180°</option>
+              <option value="270">270°</option></select
+            ><button id="rotate" aria-label="Ruota di 90 gradi">↻ 90°</button>
           </div>
-          <label for="selected" style="margin-top: 14px"
-            >Elemento selezionato</label
-          ><select id="selected"></select>
-          <div class="selection">
-            <button id="remove" class="wide">Rimuovi elemento</button>
-          </div>
-          <button id="restore" class="wide" style="margin-top: 8px">
-            Ripristina 5 contro 5 + palla
-          </button>
+          <label class="check"
+            ><input type="checkbox" id="trails" checked />Mostra segni e
+            traiettorie</label
+          >
         </section>
         <section>
-          <label for="duration">Durata della fase (secondi)</label
-          ><input
-            id="duration"
-            type="number"
-            min="0.5"
-            max="30"
-            step="0.5"
-            value="2"
-          />
-          <div class="row" style="margin-top: 14px">
-            <input type="checkbox" id="trails" checked /><label for="trails"
-              >Mostra traiettorie</label
-            >
-          </div>
+          <h3>Disegno e selezione</h3>
+          <label class="check"
+            ><input type="checkbox" id="pencilOnly" />Disegna solo con penna /
+            Apple Pencil</label
+          >
           <p class="note">
-            Ogni fase conserva posizioni, segnaletica e durata.
+            Se attivo, il dito può spostare gli elementi ma non traccia segni.
+            La pressione della penna varia il tratto libero.
+          </p>
+          <label for="selected">Elemento selezionato</label
+          ><select id="selected"></select>
+          <div class="row">
+            <button id="remove">Rimuovi elemento</button
+            ><button id="restore">Ripristina 5 contro 5 + palla</button>
+          </div>
+          <p id="toolhint" class="note">
+            Trascina un elemento oppure usa le frecce della tastiera.
           </p>
         </section>
-      </aside>
-      <main class="main">
-        <div class="topline">
-          <div>
-            <h1>La tua prossima giocata.</h1>
-            <div class="small">Disponi. Disegna. Metti in movimento.</div>
+        <section>
+          <h3>File sul dispositivo</h3>
+          <div class="row">
+            <button id="save">Esporta schema JSON</button
+            ><button id="load">Apri schema JSON</button>
           </div>
-          <span class="badge" id="courtbadge">CAMPO FIBA · 28 × 15 M</span>
-        </div>
-        <div class="court-wrap">
-          <canvas
-            id="court"
-            width="1500"
-            height="850"
-            tabindex="0"
-            aria-label="Campo da basket. Seleziona un elemento dal menu e spostalo con le frecce della tastiera."
-          ></canvas>
-          <div class="court-bottom">
-            <div class="small">
-              <span style="color: #ffbb71">●</span> Attacco 1–5 &nbsp;
-              <span style="color: #88c5ee">×</span> Difesa X1–X5 &nbsp; ● Palla
-            </div>
-            <button id="undoLine">Annulla ultimo segno</button>
-          </div>
-        </div>
-        <div class="timeline">
-          <div class="timeline-head">
-            <div>
-              <h2>SEQUENZA DELLO SCHEMA</h2>
-              <div class="small">
-                Duplica la fase, poi sposta i giocatori nella nuova posizione.
-              </div>
-            </div>
-            <div class="row">
-              <button id="deleteFrame">Elimina fase</button
-              ><button id="addFrame" class="primary">+ Aggiungi fase</button>
-            </div>
-          </div>
-          <div class="frames" id="frames"></div>
-          <div class="playbar">
-            <button id="play">▶ Riproduci</button
-            ><button id="stop" aria-label="Torna all'inizio">↶ Inizio</button
-            ><input
-              id="scrub"
-              type="range"
-              min="0"
-              max="2"
-              value="0"
-              step="0.01"
-              aria-label="Posizione nella registrazione"
-            /><output id="clock">0.0 / 2.0 s</output>
-          </div>
-        </div>
-        <div id="status" role="status" aria-live="polite">
-          Pronto. Configura la prima fase dello schema.
-        </div>
-        <details class="help">
-          <summary>Come creare lo schema · Legenda dei simboli</summary>
-          <p>
-            1. Disponi i 10 giocatori e la palla nella prima fase. 2. Aggiungi
-            una fase e modifica le posizioni: il movimento parte dalla fase
-            precedente. 3. Disegna i segni trascinando sul campo. 4. Riproduci
-            ed esporta il video. La prima fase resta visibile per la propria
-            durata; le successive animano gli spostamenti nella durata indicata.
+          <input type="file" id="file" accept="application/json,.json" hidden />
+          <p class="note">
+            Il progetto corrente viene salvato automaticamente in questo
+            browser. Il JSON è il backup da conservare o trasferire su un altro
+            dispositivo.
           </p>
-          <div class="legend">
-            <span><b>→</b> Movimento senza palla</span
-            ><span><b>⇢</b> Passaggio tratteggiato</span
-            ><span><b>↝</b> Palleggio ondulato</span><span><b>⊣</b> Blocco</span
-            ><span><b>⇉</b> Tiro a doppia linea</span>
-          </div>
-          <p>
-            La segnaletica è disegnata manualmente; gli spostamenti tra le fasi
-            sono interpolati in linea retta. Per una traiettoria curva aggiungi
-            fasi intermedie. Il video è scaricato nel formato supportato dal
-            browser (MP4 o WebM), senza audio.
+        </section>
+        <section>
+          <h3>Uso offline su iPad</h3>
+          <p id="offlineStatus" class="note">Preparazione offline…</p>
+          <p class="note">
+            Da Safari: Condividi → Aggiungi alla schermata Home → Apri come app
+            web, se disponibile. Dopo l'installazione, apri l'app una volta
+            online e attendi “Disponibile offline”.
+          </p>
+          <p class="note">
+            La prima installazione richiede HTTPS. Un indirizzo HTTP della rete
+            locale consente l'uso online, ma non l'installazione offline. Nessun
+            account, database remoto o sincronizzazione cloud.
+          </p>
+        </section>
+        <details>
+          <summary>Guida rapida e legenda</summary>
+          <p class="note">
+            Il primo frame mostra la disposizione iniziale. Aggiungi un frame
+            per copiare le posizioni e spostarle: la durata controlla il
+            passaggio dal frame precedente. Puoi tornare a ogni frame dalla
+            sequenza in alto.
+          </p>
+          <p class="note">
+            → Movimento · ⇢ Passaggio · ↝ Palleggio · ⊣ Blocco · ⇉ Tiro. Penna:
+            disegno libero. Gomma: rimuove il segno toccato. Annulla/ripristina
+            include spostamenti e frame. Le traiettorie disegnate non guidano
+            automaticamente l'animazione.
           </p>
         </details>
-        <footer>
-          Geometria FIBA e convenzioni grafiche del coaching.
-          <a
-            href="https://about.fiba.basketball/en/wabc-documents"
-            target="_blank"
-            rel="noopener"
-            >Manuali FIBA / WABC</a
-          >
-        </footer>
-      </main>
-    </div>
-    <script src="geometry.js"></script>
-    <script src="app.js"></script>
+      </div>
+    </dialog>
+    <dialog id="videoDialog" class="video-dialog">
+      <div class="drawer-head">
+        <h2>Video pronto</h2>
+        <button id="closeVideo" aria-label="Chiudi video">✕</button>
+      </div>
+      <video id="videoPreview" controls playsinline></video>
+      <div class="row">
+        <button id="downloadVideo" class="primary">Salva video</button
+        ><button id="shareVideo">Condividi / Salva su File</button>
+      </div>
+      <p id="videoHelp" class="note"></p>
+    </dialog>
+    <script src="./geometry.js"></script>
+    <script src="./local-store.js"></script>
+    <script src="./app.js"></script>
+    <script src="./offline.js"></script>
   </body>
 </html>

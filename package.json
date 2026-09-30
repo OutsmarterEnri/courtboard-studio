@@ -1,20 +1,28 @@
 {
   "name": "courtboard",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Lavagnetta tattica per basket con fasi animate ed esportazione video",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OutsmarterEnri/courtboard-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OutsmarterEnri/courtboard-studio/issues"
+  },
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "start": "node scripts/serve.cjs",
-    "check": "node --check dist/app.js && node --check dist/geometry.js && node --check scripts/serve.cjs",
-    "test:unit": "node --test tests/geometry.test.cjs",
-    "test:browser": "node --test tests/browser.test.cjs",
+    "check": "node scripts/check.cjs",
+    "test:unit": "node --test tests/unit/geometry.test.cjs",
+    "test:browser": "node --test tests/browser/editor.test.cjs tests/browser/offline.test.cjs",
     "test": "npm run check && npm run test:unit && npm run test:browser",
-    "format": "prettier --write dist scripts tests README.md CONTRIBUTING.md package.json .github",
-    "format:check": "prettier --check dist scripts tests README.md CONTRIBUTING.md package.json .github"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm test && npm run format:check"
   },
   "devDependencies": {
     "playwright": "1.63.0",

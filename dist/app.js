@@ -39,11 +39,7 @@ function applyPresets() {
   cv.width = size.width;
   cv.height = size.height;
   cv.style.aspectRatio = size.width + " / " + size.height;
-  cv.classList.toggle("compact", $("view").value === "half");
-  cv.classList.toggle(
-    "portrait",
-    size.height > size.width && $("view").value === "full",
-  );
+  fitBoard();
   $("courtbadge").textContent =
     ($("view").value === "half"
       ? "METÀ CAMPO OFFENSIVA · 14 × 15 M"
@@ -88,6 +84,38 @@ function circle(c, x, y, r, fill) {
 function court(c) {
   c.fillStyle = "#253f40";
   c.fillRect(0, 0, 1500, 850);
+  // Expanded runoff around the court: it gives inbound plays a visible
+  // staging area while keeping the saved player coordinates unchanged.
+  c.save();
+  c.strokeStyle = "#78918d";
+  c.lineWidth = 2;
+  c.setLineDash([9, 8]);
+  c.strokeRect(24, 24, 1452, 802);
+  c.setLineDash([]);
+  c.strokeStyle = "#d6b27d";
+  c.lineWidth = 2.5;
+  for (const y of [50, 800]) {
+    c.beginPath();
+    c.moveTo(24, y);
+    c.lineTo(50, y);
+    c.moveTo(1450, y);
+    c.lineTo(1476, y);
+    c.stroke();
+  }
+  for (const x of [50, 1450]) {
+    c.beginPath();
+    c.moveTo(x, 24);
+    c.lineTo(x, 50);
+    c.moveTo(x, 800);
+    c.lineTo(x, 826);
+    c.stroke();
+  }
+  c.fillStyle = "#d6b27d";
+  c.font = "12px Arial";
+  c.textAlign = "center";
+  c.fillText("RIMESSA", 37, 45);
+  c.fillText("RIMESSA", 1463, 45);
+  c.restore();
   c.save();
   c.translate(50, 50);
   c.scale(50, 50);
@@ -134,12 +162,26 @@ function court(c) {
   c.restore();
 }
 function annotation(c, l) {
+  if (l.type === "pen") {
+    c.save();
+    c.strokeStyle = l.color || "#f8e7b8";
+    c.lineCap = "round";
+    c.lineJoin = "round";
+    for (let i = 1; i < l.points.length; i++) {
+      const a = l.points[i - 1],
+        b = l.points[i];
+      c.lineWidth = (l.width || 5) * (b.pressure ?? 1);
+      line(c, a.x, a.y, b.x, b.y);
+    }
+    c.restore();
+    return;
+  }
   let p = l.points;
   if (p.length < 2) return;
   c.save();
-  c.strokeStyle = "#f8e7b8";
-  c.fillStyle = "#f8e7b8";
-  c.lineWidth = 3.5;
+  c.strokeStyle = l.color || "#f8e7b8";
+  c.fillStyle = l.color || "#f8e7b8";
+  c.lineWidth = l.width || 3.5;
   c.lineJoin = "round";
   c.lineCap = "round";
   if (l.type === "pass") c.setLineDash([11, 10]);
@@ -167,6 +209,8 @@ function annotation(c, l) {
       oy = Math.cos(ang) * 7;
     annotation(c, {
       type: "run",
+      color: l.color,
+      width: l.width,
       points: [
         { x: a.x + ox, y: a.y + oy },
         { x: b.x + ox, y: b.y + oy },
@@ -265,8 +309,15 @@ function draw(
   c.textAlign = "center";
   c.fillText("COURTBOARD", c.canvas.width / 2, c.canvas.height - 19);
   c.restore();
+  if (c === ctx && !playing && !exporting) scheduleSave();
 }
 function ui() {
+  $("frameCount").textContent =
+    String(frames.length).padStart(2, "0") + " frame";
+  $("previousFrame").disabled = index === 0;
+  $("nextFrame").disabled = index === frames.length - 1;
+  $("undoLine").disabled = !undoStack.length;
+  $("redo").disabled = !redoStack.length;
   $("frames").replaceChildren(
     ...frames.map((f, i) => {
       let b = document.createElement("button");
@@ -275,7 +326,7 @@ function ui() {
         "<strong>" +
         String(i + 1).padStart(2, "0") +
         " · " +
-        (i ? "Movimento" : "Posizione iniziale") +
+        (i ? "Frame " + (i + 1) : "Inizio") +
         "</strong><small>" +
         f.duration.toFixed(1) +
         " secondi</small>";
@@ -416,6 +467,7 @@ $("selected").onchange = () => {
 $("tools").onclick = (e) => {
   let b = e.target.closest("[data-tool]");
   if (!b || exporting) return;
+  pause();
   tool = b.dataset.tool;
   document
     .querySelectorAll("[data-tool]")
@@ -442,7 +494,24 @@ function point(e) {
   };
 }
 cv.onpointerdown = (e) => {
-  if (playing || exporting) return;
+  if (
+    playing ||
+    exporting ||
+    activePointer !== null ||
+    (e.pointerType === "mouse" && e.button !== 0)
+  )
+    return;
+  if (tool !== "move" && $("pencilOnly").checked && e.pointerType !== "pen")
+    return;
+  if (!["move", "erase"].includes(tool) && current().lines.length >= 500) {
+    say(
+      "Limite di segni raggiunto per questo frame. Usa un nuovo frame o la gomma.",
+    );
+    return;
+  }
+  activePointer = e.pointerId;
+  gestureBefore = snapshot();
+  checkpoint();
   cv.focus();
   cv.setPointerCapture(e.pointerId);
   let p = point(e);
@@ -459,13 +528,32 @@ cv.onpointerdown = (e) => {
       drag = { o, dx: o.x - p.x, dy: o.y - p.y };
       $("selected").value = selected;
     }
+  } else if (tool === "erase") {
+    eraseAt(p);
   } else {
-    draft = { type: tool, points: [p, p] };
+    draft = {
+      type: tool,
+      color: $("ink").value,
+      width: +$("strokeWidth").value,
+      points: [
+        {
+          ...p,
+          pressure:
+            e.pointerType === "pen" ? Math.max(0.2, e.pressure) * 1.8 : 1,
+        },
+        p,
+      ],
+    };
   }
   draw();
 };
 cv.onpointermove = (e) => {
-  if (exporting) return;
+  if (exporting || e.pointerId !== activePointer) return;
+  if (tool === "erase") {
+    eraseAt(point(e));
+    draw();
+    return;
+  }
   let p = point(e);
   if (drag) {
     drag.o.x = Math.max(65, Math.min(maxX(), p.x + drag.dx));
@@ -473,7 +561,20 @@ cv.onpointermove = (e) => {
   }
   if (draft) {
     let a = draft.points[0];
-    if (tool === "dribble") {
+    if (tool === "pen") {
+      for (const sample of e.getCoalescedEvents?.().length
+        ? e.getCoalescedEvents()
+        : [e]) {
+        if (draft.points.length < 2000)
+          draft.points.push({
+            ...point(sample),
+            pressure:
+              sample.pointerType === "pen"
+                ? Math.max(0.2, sample.pressure) * 1.8
+                : 1,
+          });
+      }
+    } else if (tool === "dribble") {
       let dx = p.x - a.x,
         dy = p.y - a.y,
         len = Math.hypot(dx, dy),
@@ -491,21 +592,37 @@ cv.onpointermove = (e) => {
   }
   if (drag || draft) draw();
 };
-function finish() {
+function finish(e) {
+  if (e && e.pointerId !== activePointer) return;
   if (
     draft &&
-    Math.hypot(
-      draft.points.at(-1).x - draft.points[0].x,
-      draft.points.at(-1).y - draft.points[0].y,
-    ) > 8
+    (draft.type === "pen" ||
+      Math.hypot(
+        draft.points.at(-1).x - draft.points[0].x,
+        draft.points.at(-1).y - draft.points[0].y,
+      ) > 8)
   )
     current().lines.push(draft);
   drag = null;
   draft = null;
+  activePointer = null;
+  gestureBefore = null;
   draw();
+  updateHistory();
 }
 cv.onpointerup = finish;
-cv.onpointercancel = finish;
+cv.onpointercancel = (e) => {
+  if (e.pointerId !== activePointer) return;
+  if (gestureBefore) {
+    restoreSnapshot(gestureBefore);
+    undoStack.pop();
+  }
+  drag = null;
+  draft = null;
+  activePointer = null;
+  gestureBefore = null;
+  ui();
+};
 cv.onkeydown = (e) => {
   if (playing || exporting) return;
   let o = current().items.find((o) => o.id === selected),
@@ -517,6 +634,7 @@ cv.onkeydown = (e) => {
     };
   if (o && dirs[e.key]) {
     e.preventDefault();
+    checkpoint();
     let raw = dirs[e.key],
       v = CourtGeometry.vectorToCourt({ x: raw[0], y: raw[1] }, rotation()),
       d = [v.x, v.y],
@@ -531,7 +649,14 @@ for (const type of ["cone", "barrier"])
   $(type).onclick = () => {
     if (exporting) return;
     pause();
-    let o = { id: crypto.randomUUID(), type, x: baseWidth() / 2, y: 425 };
+    let o = {
+      id:
+        crypto.randomUUID?.() ||
+        "item-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+      type,
+      x: baseWidth() / 2,
+      y: 425,
+    };
     current().items.push(o);
     selected = o.id;
     ui();
@@ -550,11 +675,8 @@ $("restore").onclick = () => {
   ui();
   say("Giocatori e palla mancanti ripristinati.");
 };
-$("undoLine").onclick = () => {
-  if (exporting) return;
-  current().lines.pop();
-  draw();
-};
+$("undoLine").onclick = () => undo();
+$("redo").onclick = () => redo();
 function download(blob, name) {
   let url = URL.createObjectURL(blob),
     a = document.createElement("a");
@@ -572,25 +694,9 @@ function filename() {
 }
 $("save").onclick = () =>
   download(
-    new Blob(
-      [
-        JSON.stringify(
-          {
-            version: 1,
-            title: $("title").value,
-            presets: {
-              teams: $("teams").value,
-              view: $("view").value,
-              rotation: rotation(),
-            },
-            frames,
-          },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json" },
-    ),
+    new Blob([JSON.stringify(project(), null, 2)], {
+      type: "application/json",
+    }),
     filename() + ".json",
   );
 $("load").onclick = () => {
@@ -598,6 +704,7 @@ $("load").onclick = () => {
 };
 function valid(data) {
   if (
+    !data ||
     data.version !== 1 ||
     typeof data.title !== "string" ||
     !Array.isArray(data.frames) ||
@@ -633,12 +740,21 @@ function valid(data) {
       f.lines.length <= 500 &&
       f.lines.every(
         (l) =>
-          ["run", "pass", "dribble", "screen", "shot"].includes(l.type) &&
+          ["run", "pass", "dribble", "screen", "shot", "pen"].includes(
+            l.type,
+          ) &&
+          (l.color === undefined || /^#[0-9a-f]{6}$/i.test(l.color)) &&
+          (l.width === undefined ||
+            (Number.isFinite(l.width) && l.width >= 1 && l.width <= 20)) &&
           Array.isArray(l.points) &&
           l.points.length >= 2 &&
           l.points.length <= 2000 &&
           l.points.every(
             (p) =>
+              (p.pressure === undefined ||
+                (Number.isFinite(p.pressure) &&
+                  p.pressure >= 0 &&
+                  p.pressure <= 2)) &&
               Number.isFinite(p.x) &&
               Number.isFinite(p.y) &&
               p.x >= 0 &&
@@ -656,16 +772,8 @@ $("file").onchange = async () => {
     if (f.size > 5000000) throw Error();
     let data = JSON.parse(await f.text());
     if (!valid(data)) throw Error();
-    pause();
-    frames = data.frames;
-    index = 0;
-    time = 0;
-    $("title").value = data.title.slice(0, 70);
-    $("teams").value = data.presets?.teams === "attack" ? "attack" : "both";
-    $("view").value = data.presets?.view === "half" ? "half" : "full";
-    $("rotation").value = String(
-      CourtGeometry.normalize(data.presets?.rotation),
-    );
+    checkpoint();
+    loadProject(data);
     applyPresets();
     say("Schema caricato.");
   } catch {
@@ -678,19 +786,24 @@ $("export").onclick = async () => {
   if (exporting) return;
   if (!window.MediaRecorder || !cv.captureStream) {
     say(
-      "Esportazione video non supportata: usa una versione recente di Chrome, Edge o Firefox.",
+      "Questo browser non supporta la registrazione video. Aggiorna Safari o usa un browser compatibile.",
     );
     return;
   }
   pause();
   exporting = true;
+  cancelRecording = false;
+  $("cancelExport").hidden = false;
   let controls = [...document.querySelectorAll("button,input,select")],
     disabled = controls.map((x) => x.disabled);
-  controls.forEach((x) => (x.disabled = true));
+  controls
+    .filter((x) => x.id !== "cancelExport")
+    .forEach((x) => (x.disabled = true));
   let stream, rec;
   try {
     const mime = [
       "video/mp4;codecs=avc1.42E01E",
+      "video/mp4",
       "video/webm;codecs=vp9",
       "video/webm;codecs=vp8",
       "video/webm",
@@ -719,6 +832,10 @@ $("export").onclick = async () => {
     let begin = performance.now();
     await new Promise((resolve) => {
       function step() {
+        if (cancelRecording) {
+          resolve();
+          return;
+        }
         let elapsed = Math.min(total(), (performance.now() - begin) / 1000),
           state = at(elapsed);
         draw(state.items, state.lines, c, false);
@@ -737,20 +854,293 @@ $("export").onclick = async () => {
     });
     rec.stop();
     let blob = await result;
-    download(
-      blob,
-      filename() + (rec.mimeType.includes("mp4") ? ".mp4" : ".webm"),
-    );
-    say("Video esportato. Trovi il file nei download del browser.");
+    if (cancelRecording) {
+      say("Esportazione annullata.");
+    } else {
+      exportedVideo = {
+        blob,
+        name: filename() + (rec.mimeType.includes("mp4") ? ".mp4" : ".webm"),
+      };
+      if (videoURL) URL.revokeObjectURL(videoURL);
+      videoURL = URL.createObjectURL(blob);
+      $("videoPreview").src = videoURL;
+      const file = new File([blob], exportedVideo.name, { type: blob.type });
+      $("shareVideo").hidden = !navigator.canShare?.({ files: [file] });
+      $("videoHelp").textContent =
+        "Il video è pronto sul dispositivo. Salvalo o condividilo prima di chiudere l’app.";
+      $("videoDialog").showModal();
+      say("Video pronto da salvare.");
+    }
   } catch (e) {
     say("Esportazione non riuscita: " + e.message);
   } finally {
     if (rec && rec.state !== "inactive") rec.stop();
     stream?.getTracks().forEach((t) => t.stop());
     exporting = false;
+    $("cancelExport").hidden = true;
     controls.forEach((x, i) => (x.disabled = disabled[i]));
     time = 0;
     ui();
   }
 };
-applyPresets();
+
+// The editor always stores positions in court coordinates, regardless of view.
+let activePointer = null,
+  gestureBefore = null;
+let undoStack = [],
+  redoStack = [];
+let hydrated = false,
+  saveTimer,
+  lastSerialized = "",
+  writeQueue = Promise.resolve();
+let exportedVideo = null,
+  videoURL = null,
+  cancelRecording = false;
+function project() {
+  return {
+    version: 1,
+    title: $("title").value,
+    presets: {
+      teams: $("teams").value,
+      view: $("view").value,
+      rotation: rotation(),
+    },
+    preferences: {
+      trails: $("trails").checked,
+      pencilOnly: $("pencilOnly").checked,
+      ink: $("ink").value,
+      width: +$("strokeWidth").value,
+    },
+    frames,
+  };
+}
+function loadProject(data) {
+  pause();
+  frames = clone(data.frames);
+  index = 0;
+  time = 0;
+  $("title").value = data.title.slice(0, 70);
+  $("teams").value = data.presets?.teams === "attack" ? "attack" : "both";
+  $("view").value = data.presets?.view === "half" ? "half" : "full";
+  $("rotation").value = String(CourtGeometry.normalize(data.presets?.rotation));
+  $("trails").checked = data.preferences?.trails !== false;
+  $("pencilOnly").checked = data.preferences?.pencilOnly === true;
+  $("ink").value = /^#[0-9a-f]{6}$/i.test(data.preferences?.ink)
+    ? data.preferences.ink
+    : "#f8e7b8";
+  $("strokeWidth").value = [3, 5, 9].includes(data.preferences?.width)
+    ? String(data.preferences.width)
+    : "5";
+}
+function scheduleSave() {
+  if (!hydrated) return;
+  clearTimeout(saveTimer);
+  $("saveStatus").textContent = "Salvataggio locale…";
+  saveTimer = setTimeout(flushSave, 180);
+}
+function flushSave() {
+  if (!hydrated) return;
+  clearTimeout(saveTimer);
+  const data = project(),
+    serialized = JSON.stringify(data);
+  if (serialized === lastSerialized) {
+    $("saveStatus").textContent = "Salvato sul dispositivo";
+    return;
+  }
+  writeQueue = writeQueue
+    .catch(() => {})
+    .then(async () => {
+      await LocalProject.save(JSON.parse(serialized));
+      lastSerialized = serialized;
+      $("saveStatus").textContent = "Salvato sul dispositivo";
+    })
+    .catch(() => {
+      $("saveStatus").textContent = "Backup JSON necessario";
+      say(
+        "Salvataggio locale non disponibile o spazio esaurito: esporta lo schema JSON.",
+      );
+    });
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) flushSave();
+});
+function snapshot() {
+  return { frames: clone(frames), index };
+}
+function restoreSnapshot(s) {
+  frames = clone(s.frames);
+  index = Math.min(s.index, frames.length - 1);
+  time = 0;
+}
+function updateHistory() {
+  $("undoLine").disabled = undoStack.length === 0;
+  $("redo").disabled = redoStack.length === 0;
+}
+function checkpoint() {
+  if (exporting) return;
+  undoStack.push(snapshot());
+  if (undoStack.length > 40) undoStack.shift();
+  redoStack = [];
+  updateHistory();
+}
+function undo() {
+  if (exporting || !undoStack.length) return;
+  pause();
+  redoStack.push(snapshot());
+  restoreSnapshot(undoStack.pop());
+  ui();
+}
+function redo() {
+  if (exporting || !redoStack.length) return;
+  pause();
+  undoStack.push(snapshot());
+  restoreSnapshot(redoStack.pop());
+  ui();
+}
+for (const id of [
+  "addFrame",
+  "deleteFrame",
+  "cone",
+  "barrier",
+  "remove",
+  "restore",
+]) {
+  const original = $(id).onclick;
+  $(id).onclick = (e) => {
+    if (exporting) return;
+    if (id === "addFrame" && frames.length >= 300) {
+      say("Limite di 300 frame raggiunto.");
+      return;
+    }
+    if (["cone", "barrier"].includes(id) && current().items.length >= 200) {
+      say("Limite di elementi raggiunto.");
+      return;
+    }
+    checkpoint();
+    original(e);
+  };
+}
+const changeDuration = $("duration").onchange;
+$("duration").onchange = (e) => {
+  checkpoint();
+  changeDuration(e);
+};
+for (const id of ["previousFrame", "nextFrame"])
+  $(id).onclick = () => {
+    if (exporting) return;
+    pause();
+    index = Math.max(
+      0,
+      Math.min(frames.length - 1, index + (id === "previousFrame" ? -1 : 1)),
+    );
+    ui();
+  };
+function distanceToSegment(p, a, b) {
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1),
+    ),
+  );
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+function eraseAt(p) {
+  const threshold = (12 * cv.width) / cv.getBoundingClientRect().width;
+  for (let i = current().lines.length - 1; i >= 0; i--) {
+    const points = current().lines[i].points;
+    if (
+      points
+        .slice(1)
+        .some((b, j) => distanceToSegment(p, points[j], b) < threshold)
+    ) {
+      current().lines.splice(i, 1);
+      return;
+    }
+  }
+}
+function fitBoard() {
+  const stage = $("boardStage");
+  if (!stage) return;
+  const size = stage.getBoundingClientRect(),
+    scale = Math.min(size.width / cv.width, size.height / cv.height);
+  $("boardSurface").style.width = Math.floor(cv.width * scale) + "px";
+  $("boardSurface").style.height = Math.floor(cv.height * scale) + "px";
+}
+new ResizeObserver(fitBoard).observe($("boardStage"));
+$("openSettings").onclick = () => {
+  pause();
+  $("settings").showModal();
+};
+$("closeSettings").onclick = () => $("settings").close();
+$("settings").addEventListener("click", (e) => {
+  const r = $("settings").getBoundingClientRect();
+  if (e.target === $("settings") && (e.clientX < r.left || e.clientX > r.right))
+    $("settings").close();
+});
+$("closeVideo").onclick = () => {
+  $("videoPreview").pause();
+  $("videoDialog").close();
+};
+$("downloadVideo").onclick = () => {
+  if (exportedVideo) download(exportedVideo.blob, exportedVideo.name);
+};
+$("shareVideo").onclick = async () => {
+  if (!exportedVideo) return;
+  try {
+    await navigator.share({
+      files: [
+        new File([exportedVideo.blob], exportedVideo.name, {
+          type: exportedVideo.blob.type,
+        }),
+      ],
+    });
+  } catch (e) {
+    if (e.name !== "AbortError")
+      $("videoHelp").textContent =
+        "Condivisione non disponibile: usa Salva video.";
+  }
+};
+$("cancelExport").onclick = () => {
+  cancelRecording = true;
+};
+for (const id of ["ink", "strokeWidth", "pencilOnly"])
+  $(id).addEventListener("change", scheduleSave);
+document.addEventListener("keydown", (e) => {
+  if (
+    e.target.closest("input,select,textarea") ||
+    $("settings").open ||
+    $("videoDialog").open
+  )
+    return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    e.preventDefault();
+    e.shiftKey ? redo() : undo();
+  }
+});
+async function boot() {
+  document.querySelector(".app").inert = true;
+  try {
+    const saved = await LocalProject.load();
+    if (saved) {
+      if (!valid(saved)) throw Error("invalid");
+      loadProject(saved);
+      lastSerialized = JSON.stringify(project());
+      say("Progetto ripristinato dal dispositivo.");
+    }
+    $("saveStatus").textContent = "Salvato sul dispositivo";
+  } catch {
+    $("saveStatus").textContent = "Backup JSON necessario";
+    say(
+      "Archivio locale non disponibile: salva una copia JSON delle modifiche.",
+    );
+  } finally {
+    applyPresets();
+    hydrated = true;
+    document.querySelector(".app").inert = false;
+    fitBoard();
+  }
+}
+boot();
